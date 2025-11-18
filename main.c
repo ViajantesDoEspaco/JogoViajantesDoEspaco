@@ -394,7 +394,8 @@ void update_inimigos() {
     if (inimigo_mover_timer >= inimigo_mover_delay) {
         for (int j = 0; j < MAX_INIMIGOS; j++) {
             if (inimigos[j].ativo) {
-                if (inimigos[j].rect.x + inimigos[j].rect.w + inimigo_velX * inimigo_dir > WINDOW_LARGURA) {
+                if (inimigos[j].rect.x + inimigos[j].rect.w +
+                    inimigo_velX * inimigo_dir > WINDOW_LARGURA) {
                     atingiu_limite = true;
                 }
                 if (inimigos[j].rect.x + inimigo_velX * inimigo_dir < 0) {
@@ -431,7 +432,8 @@ void update_inimigos() {
             // Inimigo atira
             inimigos[j].timer_tiros++;
             if (inimigos[j].timer_tiros >= 180 + (rand() % 60)) { 
-                inimigo_atirar(inimigos[j].rect.x + inimigos[j].rect.w / 2, inimigos[j].rect.y + inimigos[j].rect.h);
+                inimigo_atirar(inimigos[j].rect.x + inimigos[j].rect.w / 2,
+                                inimigos[j].rect.y + inimigos[j].rect.h);
                 inimigos[j].timer_tiros = 0;
             }
         }
@@ -750,7 +752,8 @@ int main(int argc, char **argv) {
             update_player_tiros();
             update_inimigo_tiros();
             update_inimigos();
-        } else if (estado_atual == MENU || estado_atual == GAME_OVER || estado_atual == CREDITOS) {
+        } else if (estado_atual == MENU || estado_atual == GAME_OVER ||
+                    estado_atual == CREDITOS) {
             update_parallax();
         }
 
