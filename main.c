@@ -508,7 +508,7 @@ void render_menu(SDL_Renderer* renderer) {
     render_parallax(renderer); 
     SDL_Color white = {255, 255, 255, 255};
     
-    render_texto(renderer, font_medium, "VIAJANTES DO ESPACO", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/4, white);
+    render_texto(renderer, font_large, "VIAJANTES DO ESPACO", WINDOW_LARGURA/2 - 520, WINDOW_ALTURA/4, white);
     render_texto(renderer, font_small, "INICIAR JOGO", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 - 50, white);
     render_texto(renderer, font_small, "CREDITOS", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 20, white);
     render_texto(renderer, font_small, "SAIR", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 90, white);
@@ -568,7 +568,7 @@ void render_game_over(SDL_Renderer* renderer) {
     SDL_Color red = {255, 0, 0, 255};
     SDL_Color white = {255, 255, 255, 255};
     
-    render_texto(renderer, font_medium, "GAME OVER", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA/2 - 80, red);
+    render_texto(renderer, font_large, "GAME OVER", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 - 80, red);
 
     char pontuacao_str[50];
     sprintf(pontuacao_str, "PONTUACAO FINAL: %d", pontuacao);
@@ -576,7 +576,7 @@ void render_game_over(SDL_Renderer* renderer) {
     TTF_SizeText(font_small, pontuacao_str, &text_w, &text_h);
     render_texto(renderer, font_small, pontuacao_str, WINDOW_LARGURA/2 - text_w/2, WINDOW_ALTURA/2 + 20, white);
 
-    render_texto(renderer, font_smaller, "Pressione M para voltar ao Menu", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA/2 + 100, white);
+    render_texto(renderer, font_smaller, "Pressione ESC para voltar ao Menu", WINDOW_LARGURA/2 - 200, WINDOW_ALTURA - 50, white);
 }
 
 void render_creditos(SDL_Renderer* renderer) {
@@ -589,7 +589,7 @@ void render_creditos(SDL_Renderer* renderer) {
     render_texto(renderer, font_small, "Ano: 2025", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 + 20, white);
     render_texto(renderer, font_small, "Agradecimentos: ....", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 + 90, white);
 
-    render_texto(renderer, font_smaller, "Pressione ESC para voltar ao Menu", WINDOW_LARGURA/2 - 300, WINDOW_ALTURA - 50, white);
+    render_texto(renderer, font_smaller, "Pressione ESC para voltar ao Menu", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA - 50, white);
 }
 
 
@@ -641,6 +641,11 @@ void jogo_input(SDL_Event *e) {
             case SDL_SCANCODE_RIGHT: dirPress = true; break;
             case SDL_SCANCODE_UP: cimaPress = true; break;
             case SDL_SCANCODE_DOWN: baixoPress = true; break;
+            
+            case SDL_SCANCODE_ESCAPE:
+            	estado_atual = SAIR;
+            	rodando = false;
+            	break;
         }
     } else if (e->type == SDL_KEYUP) {
         switch (e->key.keysym.scancode) {
@@ -683,10 +688,10 @@ int main(int argc, char **argv) {
     if (!font_smaller || !font_small || !font_medium || !font_large) {
         printf("Erro ao carregar fonte (%s): %s\n", FONT_PATH, TTF_GetError());
     }
-
-    SDL_Window* window = SDL_CreateWindow("VIAJANTES DO ESPACO",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        WINDOW_LARGURA, WINDOW_ALTURA, 0);
+    
+    // criar janela para ficar em tela cheia
+    SDL_Window* window = SDL_CreateWindow("VIAJANTES DO ESPACO", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    						WINDOW_LARGURA, WINDOW_ALTURA, SDL_WINDOW_SHOWN | SDL_WINDOW_MAXIMIZED);
 
     SDL_Renderer* renderer;
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -706,7 +711,14 @@ int main(int argc, char **argv) {
     SDL_Event e;
     
     while (rodando) {
-        if (SDL_WaitEventTimeout(&e, DELAY_FRAME)) { 
+        if (SDL_WaitEventTimeout(&e, DELAY_FRAME)) {
+            if (e.type == SDL_MOUSEMOTION ||
+    			e.type == SDL_MOUSEBUTTONDOWN ||
+			    e.type == SDL_MOUSEBUTTONUP ||
+			    e.type == SDL_MOUSEWHEEL) {
+			    // descarta o evento
+			}
+
             if (e.type == SDL_QUIT) {
                 rodando = false;
                 estado_atual = SAIR;
@@ -720,7 +732,7 @@ int main(int argc, char **argv) {
                     jogo_input(&e);
                     break;
                 case GAME_OVER:
-                    if (e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_M) {
+                    if (e.type == SDL_KEYDOWN && e.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
                         estado_atual = MENU;
                     }
                 case CREDITOS:
