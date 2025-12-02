@@ -8,8 +8,8 @@
 #include <string.h> 
 
 // --- GERAIS ---
-#define WINDOW_LARGURA 1000
-#define WINDOW_ALTURA 600
+#define WINDOW_LARGURA 1300
+#define WINDOW_ALTURA 650
 #define DELAY_FRAME 16 
 
 #define PLAYER_MAX_TIROS 50 
@@ -84,17 +84,12 @@ SDL_Renderer* renderer = NULL;
 int pontuacao = 0;
 
 //TTF
-
+TTF_Font* font_smaller = NULL;
 TTF_Font* font_small = NULL;
 TTF_Font* font_medium = NULL;
 TTF_Font* font_large = NULL;
 
-const char* FONT_PATH = "DejaVuSans.ttf"; 
-const char* CREDITS_TEXT = 
-    "DESENVOLVEDOR: CLARISSA BERLIM\n"
-    "ANO: 2025\n"
-    "VIAJANTES DO ESPACO\n"
-    "AGRADECIMENTOS: ...";
+const char* FONT_PATH = "PressStart.ttf"; 
 
 SDL_Texture* player_textura = NULL;
 SDL_Texture* inimigo_textura = NULL;
@@ -514,9 +509,11 @@ void render_menu(SDL_Renderer* renderer) {
     SDL_Color white = {255, 255, 255, 255};
     
     render_texto(renderer, font_medium, "VIAJANTES DO ESPACO", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/4, white);
-    render_texto(renderer, font_small, "S - INICIAR JOGO", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 - 50, white);
-    render_texto(renderer, font_small, "C - CREDITOS", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 20, white);
-    render_texto(renderer, font_small, "Q - SAIR", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 90, white);
+    render_texto(renderer, font_small, "INICIAR JOGO", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 - 50, white);
+    render_texto(renderer, font_small, "CREDITOS", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 20, white);
+    render_texto(renderer, font_small, "SAIR", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 90, white);
+    
+    render_texto(renderer, font_smaller, "Pressione S para iniciar, C para ver os creditos e Q para sair do jogo", WINDOW_LARGURA/2 - 450, WINDOW_ALTURA - 50, white);
 }
 
 void render_jogo(SDL_Renderer* renderer) {
@@ -555,15 +552,15 @@ void render_jogo(SDL_Renderer* renderer) {
     // 5. Renderização do pontuacao (TTF)
     char pontuacao_str[50];
     sprintf(pontuacao_str, "PONTUACAO: %d", pontuacao);
-    render_texto(renderer, font_small, pontuacao_str, 10, 10, white);
+    render_texto(renderer, font_smaller, pontuacao_str, 10, 10, white);
 
     // 6. Renderização da Vida do Jogador (TTF)
     char saude_str[20];
     sprintf(saude_str, "VIDA: %d/%d", player.saude, PLAYER_MAX_SAUDE);
     
     int text_w, text_h;
-    TTF_SizeText(font_small, saude_str, &text_w, &text_h);
-    render_texto(renderer, font_small, saude_str, WINDOW_LARGURA - text_w - 10, 10, white);
+    TTF_SizeText(font_smaller, saude_str, &text_w, &text_h);
+    render_texto(renderer, font_smaller, saude_str, WINDOW_LARGURA - text_w - 10, 10, white);
 }
 
 void render_game_over(SDL_Renderer* renderer) {
@@ -579,31 +576,22 @@ void render_game_over(SDL_Renderer* renderer) {
     TTF_SizeText(font_small, pontuacao_str, &text_w, &text_h);
     render_texto(renderer, font_small, pontuacao_str, WINDOW_LARGURA/2 - text_w/2, WINDOW_ALTURA/2 + 20, white);
 
-    render_texto(renderer, font_small, "Pressione M para voltar ao Menu", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA/2 + 100, white);
+    render_texto(renderer, font_smaller, "Pressione M para voltar ao Menu", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA/2 + 100, white);
 }
 
 void render_creditos(SDL_Renderer* renderer) {
     render_parallax(renderer);
     SDL_Color white = {255, 255, 255, 255};
     
-    render_texto(renderer, font_medium, "CREDITOS", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA/4 - 50, white);
+    render_texto(renderer, font_medium, "CREDITOS", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/4 - 50, white);
     
-    //alterar isso aqui pra fazer render_texto 
-    char temp_str[256];
-    strcpy(temp_str, CREDITS_TEXT);
-    char* line = strtok(temp_str, "\n");
-    int y_offset = WINDOW_ALTURA/4 + 50;
-    
-    while(line != NULL) {
-        int text_w, text_h;
-        TTF_SizeText(font_small, line, &text_w, &text_h);
-        render_texto(renderer, font_small, line, WINDOW_LARGURA/2 - text_w/2, y_offset, white);
-        y_offset += 40;
-        line = strtok(NULL, "\n");
-    }
+    render_texto(renderer, font_small, "Desenvolvedor: Clarissa Berlim", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 - 50, white);
+    render_texto(renderer, font_small, "Ano: 2025", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 + 20, white);
+    render_texto(renderer, font_small, "Agradecimentos: ....", WINDOW_LARGURA/2 - 250, WINDOW_ALTURA/2 + 90, white);
 
-    render_texto(renderer, font_small, "Pressione ESC para voltar ao Menu", WINDOW_LARGURA/2 - 150, WINDOW_ALTURA - 50, white);
+    render_texto(renderer, font_smaller, "Pressione ESC para voltar ao Menu", WINDOW_LARGURA/2 - 300, WINDOW_ALTURA - 50, white);
 }
+
 
 // --- FUNÇÃO LIMPEZA ---
 void limpar() {
@@ -687,11 +675,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    font_smaller = TTF_OpenFont(FONT_PATH, 14);
     font_small = TTF_OpenFont(FONT_PATH, 18);
     font_medium = TTF_OpenFont(FONT_PATH, 30);
     font_large = TTF_OpenFont(FONT_PATH, 60);
 
-    if (!font_small || !font_medium || !font_large) {
+    if (!font_smaller || !font_small || !font_medium || !font_large) {
         printf("Erro ao carregar fonte (%s): %s\n", FONT_PATH, TTF_GetError());
     }
 
