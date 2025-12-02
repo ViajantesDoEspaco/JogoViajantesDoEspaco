@@ -451,6 +451,7 @@ void update_inimigos() {
             }
         }
     }
+	//adicionar aqui uma animação quando o inimigo é atingido
     
     // Checagem de Game Over (Inimigo atinge o limite inferior)
     for (int j = 0; j < MAX_INIMIGOS; j++) {
