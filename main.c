@@ -555,13 +555,29 @@ void render_jogo(SDL_Renderer* renderer) {
     sprintf(pontuacao_str, "PONTUACAO: %d", pontuacao);
     render_texto(renderer, font_smaller, pontuacao_str, 10, 10, white);
 
-    // 6. Renderização da Vida do Jogador (TTF)
-    char saude_str[20];
-    sprintf(saude_str, "VIDA: %d/%d", player.saude, PLAYER_MAX_SAUDE);
-    
-    int text_w, text_h;
-    TTF_SizeText(font_smaller, saude_str, &text_w, &text_h);
-    render_texto(renderer, font_smaller, saude_str, WINDOW_LARGURA - text_w - 10, 10, white);
+    // 6. Renderização da vida do jogador (barra de vida - alterado)
+	int barraLarguraMax = 200;
+	int barraAltura = 20;
+
+	int barraX = WINDOW_LARGURA - barraLarguraMax - 20;
+	int barraY = 20;
+
+	// fundo vermelho
+	SDL_Rect barraFundo = { barraX, barraY, barraLarguraMax, barraAltura };
+	SDL_SetRenderDrawColor(renderer, 150, 0, 0, 255);
+	SDL_RenderFillRect(renderer, &barraFundo);
+
+	// parte verde proporcional à vida
+	float proporcao = (float)player.saude / (float)PLAYER_MAX_SAUDE;
+	int barraLargura = (int)(barraLarguraMax * proporcao);
+
+	SDL_Rect barraVida = { barraX, barraY, barraLargura, barraAltura };
+	SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+	SDL_RenderFillRect(renderer, &barraVida);
+
+	// borda branca
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderDrawRect(renderer, &barraFundo);
 }
 
 void render_game_over(SDL_Renderer* renderer) {
