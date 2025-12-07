@@ -25,6 +25,13 @@
 #define VELOCIDADE_FASE 2 
 #define TEXTURAS_METEOROS 5
 
+// --- EXPLOSAO ---
+#define EXPLOSAO_FRAMES 4
+#define MAX_EXPLOSOES 30
+
+// --- POWERUPS ---
+#define MAX_POWERUPS 10
+
 // --- ENUM PARA OS ESTADOS DO JOGO ---
 typedef enum {
     MENU,
@@ -71,6 +78,21 @@ typedef struct {
     int id_textura; // ID da textura do meteoro (0 a 4)
 } Meteoro;
 
+typedef struct {
+    SDL_Rect rect;
+    int frame;   // 0..EXPLOSAO_FRAMES-1
+    int ativo;
+    int timer;   // contador de frames
+} Explosao;
+
+typedef struct {
+    SDL_Rect rect;
+    int ativo;
+    int tipo;   // 0 = hp, 1 = damage
+    float velX;
+    float velY;
+} PowerUp;
+
 // --- VARIÁVEIS GLOBAIS ---
 EstadoJogo estado_atual = MENU;
 Player player;
@@ -79,6 +101,9 @@ Projetil inimigo_tiros[INIMIGOS_MAX_TIROS];
 Inimigo inimigos[MAX_INIMIGOS];
 Estrela estrelas[MAX_ESTRELAS];
 Meteoro meteoros[MAX_METEOROS];
+Explosao explosoes[MAX_EXPLOSOES];
+PowerUp powerups[MAX_POWERUPS];
+
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
@@ -90,13 +115,16 @@ TTF_Font* font_small = NULL;
 TTF_Font* font_medium = NULL;
 TTF_Font* font_large = NULL;
 
-const char* FONT_PATH = "PressStart.ttf"; 
+const char* FONT_PATH = "assets/PressStart.ttf"; 
 
 SDL_Texture* player_textura = NULL;
 SDL_Texture* inimigo_textura = NULL;
 SDL_Texture* meteoro_textura[TEXTURAS_METEOROS];
+SDL_Texture* explosao_texturas[EXPLOSAO_FRAMES];
+SDL_Texture* powerup_hp = NULL;
+SDL_Texture* powerup_damage = NULL;
 
-// Variáveis de controle de movimento 
+// Movimento player
 bool esqPress = false;
 bool dirPress = false;
 bool cimaPress = false;
@@ -104,18 +132,23 @@ bool baixoPress = false;
 
 bool rodando = true;
 
-// Variáveis de movimento dos inimigos
+// Movimento inimigos
 int inimigo_dir = 1; 
 int inimigo_mover_timer = 0;
 const int inimigo_mover_delay = 60; 
-const int inimigo_velX= 5;
-const int inimigo_velY = 20;
+const int inimigo_velX= 7;
+const int inimigo_velY = 25;
 
-// Variáveis de controle dos efeitos sonoros
+// Efeitos sonoros
 Mix_Music* musica_geral = NULL;
 Mix_Chunk* som_tiros = NULL;
 Mix_Chunk* som_gameover = NULL;
+Mix_Chunk* som_explosao = NULL;
+Mix_Chunk* som_powerUp = NULL;
 
+// Controle power-ups
+bool powerups_spawned = false;
+int dano_do_player = 1;
 
 // --- FUNÇÕES ---
 
@@ -124,9 +157,7 @@ bool colidem(SDL_Rect a, SDL_Rect b) {
 }
 
 // Carregar texturas
-bool carregar_texturas(SDL_Renderer* renderer) {
-    char buffer[100];
-    
+bool carregar_texturas(SDL_Renderer* renderer) {    
     // Player
     player_textura = IMG_LoadTexture(renderer, "assets/player.png");
     if (!player_textura) {
@@ -156,6 +187,34 @@ bool carregar_texturas(SDL_Renderer* renderer) {
             printf("Falha ao carregar %s: %s\n", arquivos_meteoros[i], IMG_GetError());
             return false;
         }
+    }
+
+    // Explosões (4 frames)
+    char* arquivos_explosao[EXPLOSAO_FRAMES] = {
+        "assets/explosao_inimigo (1).png",
+        "assets/explosao_inimigo (2).png",
+        "assets/explosao_inimigo (3).png",
+        "assets/explosao_inimigo (4).png"
+    };
+
+    for (int i = 0; i < EXPLOSAO_FRAMES; i++) {
+        explosao_texturas[i] = IMG_LoadTexture(renderer, arquivos_explosao[i]);
+        if (!explosao_texturas[i]) {
+            printf("Falha ao carregar %s: %s\n", arquivos_explosao[i], IMG_GetError());
+            return false;
+        }
+    }
+
+    // Powerups
+    powerup_hp = IMG_LoadTexture(renderer, "assets/bonus_hp.png");
+    if (!powerup_hp) {
+        printf("Falha ao carregar bonus_hp.png: %s\n", IMG_GetError());
+        return false;
+    }
+    powerup_damage = IMG_LoadTexture(renderer, "assets/bonus_damage.png");
+    if (!powerup_damage) {
+        printf("Falha ao carregar bonus_damage.png: %s\n", IMG_GetError());
+        return false;
     }
 
     return true;
@@ -240,6 +299,29 @@ void iniciar_inimigos_tiros() {
     }
 }
 
+void iniciar_explosoes() {
+    for (int i = 0; i < MAX_EXPLOSOES; i++) {
+        explosoes[i].ativo = 0;
+        explosoes[i].frame = 0;
+        explosoes[i].timer = 0;
+        explosoes[i].rect.x = 0;
+        explosoes[i].rect.y = 0;
+        explosoes[i].rect.w = 0;
+        explosoes[i].rect.h = 0;
+    }
+}
+
+void iniciar_powerups() {
+    for (int i = 0; i < MAX_POWERUPS; i++) {
+        powerups[i].ativo = 0;
+        powerups[i].tipo = 0;
+        powerups[i].velX = 0.0f;
+        powerups[i].velY = 0.0f;
+        powerups[i].rect.w = 0;
+        powerups[i].rect.h = 0;
+    }
+}
+
 void resetar_jogo() {
     iniciar_player();
     iniciar_inimigos();
@@ -247,9 +329,55 @@ void resetar_jogo() {
     iniciar_inimigos_tiros();
     iniciar_estrelas();
     iniciar_meteoros();
+    iniciar_explosoes();
+    iniciar_powerups();
     pontuacao = 0;
     inimigo_dir = 1;
     inimigo_mover_timer = 0;
+    dano_do_player = 1;
+    powerups_spawned = false;
+}
+
+void criar_explosao_em(SDL_Rect srcRect) {
+    for (int e = 0; e < MAX_EXPLOSOES; e++) {
+        if (!explosoes[e].ativo) {
+            explosoes[e].ativo = 1;
+            explosoes[e].frame = 0;
+            explosoes[e].timer = 0;
+            explosoes[e].rect.x = srcRect.x;
+            explosoes[e].rect.y = srcRect.y;
+            explosoes[e].rect.w = srcRect.w;
+            explosoes[e].rect.h = srcRect.h;
+            Mix_PlayChannel(-1, som_explosao, 0);
+            break;
+        }
+    }
+}
+
+void spawn_powerups_no(int x, int y) {
+    // spawn dois powerups no local x,y
+    int spawned = 0;
+    for (int i = 0; i < MAX_POWERUPS && spawned < 2; i++) {
+        if (!powerups[i].ativo) {
+            powerups[i].ativo = 1;
+            powerups[i].rect.w = 40;
+            powerups[i].rect.h = 40;
+            powerups[i].rect.x = x;
+            powerups[i].rect.y = y;
+
+            powerups[i].tipo = spawned; // 0 -> hp, 1 -> damage
+
+            // direção diagonal para baixo: um para esquerda, outro para direita, velocidades diferentes
+            if (spawned == 0) {
+                powerups[i].velX = -2.5f;
+                powerups[i].velY = 3.0f;
+            } else {
+                powerups[i].velX = 2.5f;
+                powerups[i].velY = 4.0f;
+            }
+            spawned++;
+        }
+    }
 }
 
 void player_atirar() {
@@ -391,6 +519,48 @@ void update_inimigo_tiros() {
     }
 }
 
+void update_explosoes() {
+    for (int i = 0; i < MAX_EXPLOSOES; i++) {
+        if (explosoes[i].ativo) {
+            explosoes[i].timer++;
+            if (explosoes[i].timer >= 6) { // frames por troca
+                explosoes[i].timer = 0;
+                explosoes[i].frame++;
+                if (explosoes[i].frame >= EXPLOSAO_FRAMES) {
+                    explosoes[i].ativo = 0;
+                }
+            }
+        }
+    }
+}
+
+void update_powerups() {
+    for (int i = 0; i < MAX_POWERUPS; i++) {
+        if (powerups[i].ativo) {
+            powerups[i].rect.x = (int)(powerups[i].rect.x + powerups[i].velX);
+            powerups[i].rect.y = (int)(powerups[i].rect.y + powerups[i].velY);
+
+            // sair da tela
+            if (powerups[i].rect.y > WINDOW_ALTURA || powerups[i].rect.x < -100 || powerups[i].rect.x > WINDOW_LARGURA + 100) {
+                powerups[i].ativo = 0;
+                continue;
+            }
+
+            // colisão com player
+            if (SDL_HasIntersection(&powerups[i].rect, &player.rect)) {
+                Mix_PlayChannel(-1, som_powerup, 0);
+                if (powerups[i].tipo == 0) {
+                    player.saude += 3;
+                    if (player.saude > PLAYER_MAX_SAUDE) player.saude = PLAYER_MAX_SAUDE;
+                } else if (powerups[i].tipo == 1) {
+                    dano_do_player *= 2;
+                }
+                powerups[i].ativo = 0;
+            }
+        }
+    }
+}
+
 void update_inimigos() {
     bool atingiu_limite = false;
     inimigo_mover_timer++;
@@ -449,18 +619,40 @@ void update_inimigos() {
             for (int j = 0; j < MAX_INIMIGOS; j++) {
                 if (inimigos[j].ativo && colidem(player_tiros[i].rect, inimigos[j].rect)) {
                     player_tiros[i].ativo = 0;
-                    inimigos[j].saude--;
+                    inimigos[j].saude -= dano_do_player;
 
                     if (inimigos[j].saude <= 0) {
+                        // salvar a posição do ultimo inimigo morto
+                        SDL_Rect ultimaPos = inimigos[j].rect;
                         inimigos[j].ativo = false;
                         pontuacao += 10;
+
+                        // criar explosão
+                        criar_explosao_em(ultimaPos);
+
+                        // checar se todos os inimigos morreram
+                        bool todosMortos = true;
+                        for (int k = 0; k < MAX_INIMIGOS; k++) {
+                            if (inimigos[k].ativo) {
+                                todosMortos = false;
+                                break;
+                            }
+                        }
+                        
+                        if (todosMortos && !powerups_spawned) {
+                            Mix_PlayChannel(-1, som_explosao, 0);
+                            Mix_PlayChannel(-1, som_explosao, 0);
+                            Mix_PlayChannel(-1, som_explosao, 0);
+                            // spawn de dois powerups na posição do ultimo inimigo
+                            spawn_powerups_no(ultimaPos.x + ultimaPos.w/2, ultimaPos.y + ultimaPos.h/2);
+                            powerups_spawned = true;
+                        }
                     }
                     break; 
                 }
             }
         }
     }
-	//adicionar aqui uma animação quando o inimigo é atingido
     
     // Checagem de Game Over (Inimigo atinge o limite inferior)
     for (int j = 0; j < MAX_INIMIGOS; j++) {
@@ -534,6 +726,16 @@ void render_jogo(SDL_Renderer* renderer) {
     if (player_textura != NULL && (player.invencivel == 0 || player.invencivel % 10 < 5)) {
         SDL_RenderCopy(renderer, player_textura, NULL, &player.rect);
     }
+
+    // Explosões (por cima do player e inimigos)
+    for (int i = 0; i < MAX_EXPLOSOES; i++) {
+        if (explosoes[i].ativo) {
+            int frame = explosoes[i].frame;
+            if (frame < EXPLOSAO_FRAMES && explosao_texturas[frame] != NULL) {
+                SDL_RenderCopy(renderer, explosao_texturas[frame], NULL, &explosoes[i].rect);
+            }
+        }
+    }
     
     // 2. Projéteis do Jogador (Amarelos)
     SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); 
@@ -554,17 +756,24 @@ void render_jogo(SDL_Renderer* renderer) {
     // 4. Inimigos (textura)
     for (int i = 0; i < MAX_INIMIGOS; i++) {
         if (inimigos[i].ativo && inimigo_textura != NULL) {
-            // Implementar invencibilidade visual depois
             SDL_RenderCopy(renderer, inimigo_textura, NULL, &inimigos[i].rect);
         }
     }
 
-    // 5. Renderização do pontuacao (TTF)
+    // 5. Powerups
+    for (int i = 0; i < MAX_POWERUPS; i++) {
+        if (powerups[i].ativo) {
+            SDL_Texture* tex = (powerups[i].tipo == 0 ? powerup_hp : powerup_damage);
+            if (tex) SDL_RenderCopy(renderer, tex, NULL, &powerups[i].rect);
+        }
+    }
+
+    // 6. Renderização do pontuacao (TTF)
     char pontuacao_str[50];
     sprintf(pontuacao_str, "PONTUACAO: %d", pontuacao);
     render_texto(renderer, font_smaller, pontuacao_str, 10, 10, white);
 
-    // 6. Renderização da vida do jogador (barra de vida - alterado)
+    // 7. Renderização da vida do jogador (barra de vida)
 	int barraLarguraMax = 200;
 	int barraAltura = 20;
 
@@ -627,9 +836,15 @@ void limpar() {
     for (int i = 0; i < TEXTURAS_METEOROS; i++) {
         SDL_DestroyTexture(meteoro_textura[i]);
     }
+    for (int i = 0; i < EXPLOSAO_FRAMES; i++) {
+        if (explosao_texturas[i]) SDL_DestroyTexture(explosao_texturas[i]);
+    }
+    SDL_DestroyTexture(powerup_hp);
+    SDL_DestroyTexture(powerup_damage);
     IMG_Quit();
     
     // TTF
+    TTF_CloseFont(font_smaller);
     TTF_CloseFont(font_small);
     TTF_CloseFont(font_medium);
     TTF_CloseFont(font_large);
@@ -639,6 +854,8 @@ void limpar() {
     Mix_FreeMusic(musica_geral);
     Mix_FreeChunk(som_tiros);
     Mix_FreeChunk(som_gameover);
+    Mix_FreeChunk(som_explosao);
+    Mix_FreeChunk(som_powerUp);
     Mix_CloseAudio();
     
     // SDL
@@ -694,7 +911,7 @@ void jogo_input(SDL_Event *e) {
 int main(int argc, char **argv) {
     srand((unsigned int)SDL_GetTicks()); 
     
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         printf("Erro ao inicializar SDL: %s\n", SDL_GetError());
         return 1;
     }
@@ -744,10 +961,12 @@ int main(int argc, char **argv) {
 
     // Carregar sons
     musica_geral = Mix_LoadMUS("assets/soundtrack.mp3");
-    som_tiros = Mix_LoadWAV("assets/sound_playerTiros.mp3");
-    som_gameover = Mix_LoadWAV("assets/sound_gameOver.mp3");
+    som_tiros = Mix_LoadWAV("assets/sound_playerTiros.wav");
+    som_gameover = Mix_LoadWAV("assets/sound_gameOver.wav");
+    som_explosao = Mix_LoadWAV("assets/sound_explosao.wav");
+    som_powerUp = Mix_LoadWAV("assets/sound_powerUp.wav");
 
-    if (!musica_geral || !som_tiros || !som_gameover) {
+    if (!musica_geral || !som_tiros || !som_gameover || som_explosao || som_powerUp) {
         printf("Erro carregando audio: %s\n", Mix_GetError());
     }
 
@@ -800,6 +1019,8 @@ int main(int argc, char **argv) {
             update_player_tiros();
             update_inimigo_tiros();
             update_inimigos();
+            update_explosoes();
+            update_powerups();
         } else if (estado_atual == MENU || estado_atual == GAME_OVER ||
                     estado_atual == CREDITOS) {
             update_parallax();
