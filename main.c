@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -109,6 +110,12 @@ int inimigo_mover_timer = 0;
 const int inimigo_mover_delay = 60; 
 const int inimigo_velX= 5;
 const int inimigo_velY = 20;
+
+// Variáveis de controle dos efeitos sonoros
+Mix_Music* musica_geral = NULL;
+Mix_Chunk* som_tiros = NULL;
+Mix_Chunk* som_gameover = NULL;
+
 
 // --- FUNÇÕES ---
 
@@ -251,6 +258,7 @@ void player_atirar() {
             player_tiros[i].rect.x = player.rect.x + (player.rect.w / 2) - (player_tiros[i].rect.w / 2);
             player_tiros[i].rect.y = player.rect.y;
             player_tiros[i].ativo = 1;
+            Mix_PlayChannel(-1, som_tiros, 0);
             return;
         }
     }
@@ -305,6 +313,7 @@ void update_parallax() {
 void update_player() {
     if (player.saude <= 0) {
         estado_atual = GAME_OVER;
+        Mix_PlayChannel(-1, som_gameover, 0);
         return;
     }
     int movimentoX = 0;
@@ -625,6 +634,12 @@ void limpar() {
     TTF_CloseFont(font_medium);
     TTF_CloseFont(font_large);
     TTF_Quit();
+
+    // Mixer
+    Mix_FreeMusic(musica_geral);
+    Mix_FreeChunk(som_tiros);
+    Mix_FreeChunk(som_gameover);
+    Mix_CloseAudio();
     
     // SDL
     if (renderer) SDL_DestroyRenderer(renderer);
@@ -697,6 +712,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("Erro ao iniciar SDL_mixer: %s\n", Mix_GetError());
+    }
+
     font_smaller = TTF_OpenFont(FONT_PATH, 14);
     font_small = TTF_OpenFont(FONT_PATH, 18);
     font_medium = TTF_OpenFont(FONT_PATH, 30);
@@ -723,7 +742,18 @@ int main(int argc, char **argv) {
         limpar();
     }
 
+    // Carregar sons
+    musica_geral = Mix_LoadMUS("assets/soundtrack.mp3");
+    som_tiros = Mix_LoadWAV("assets/sound_playerTiros.mp3");
+    som_gameover = Mix_LoadWAV("assets/sound_gameOver.mp3");
+
+    if (!musica_geral || !som_tiros || !som_gameover) {
+        printf("Erro carregando audio: %s\n", Mix_GetError());
+    }
+
     resetar_jogo(); 
+
+    Mix_PlayMusic(musica_geral, -1); // -1 = loop infinito para o soundtrack ficar tocando sempre
     
     SDL_Event e;
     
