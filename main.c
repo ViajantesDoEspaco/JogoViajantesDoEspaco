@@ -758,13 +758,46 @@ void render_parallax(SDL_Renderer* renderer) {
 void render_menu(SDL_Renderer* renderer) {
     render_parallax(renderer); 
     SDL_Color white = {255, 255, 255, 255};
-    
-    render_texto(renderer, font_large, "VIAJANTES DO ESPACO", WINDOW_LARGURA/2 - 520, WINDOW_ALTURA/4, white);
-    render_texto(renderer, font_small, "INICIAR JOGO", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 - 50, white);
-    render_texto(renderer, font_small, "CREDITOS", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 20, white);
-    render_texto(renderer, font_small, "SAIR", WINDOW_LARGURA/2 - 100, WINDOW_ALTURA/2 + 90, white);
-    
-    render_texto(renderer, font_smaller, "Pressione S para iniciar, C para ver os creditos e Q para sair do jogo", WINDOW_LARGURA/2 - 450, WINDOW_ALTURA - 50, white);
+    render_texto(renderer, font_large, "VIAJANTES DO ESPACO",
+                 WINDOW_LARGURA/2 - 520, WINDOW_ALTURA/6, white);
+
+    const char* opcoes[] = { "INICIAR JOGO", "CREDITOS", "SAIR" };
+    const int numOpcoes = 3;
+
+    int larguraBotao = 350;
+    int alturaBotao = 60;
+    int espacamento = 30;
+
+    int totalAltura = numOpcoes * alturaBotao + (numOpcoes - 1) * espacamento;
+    int inicioY = (WINDOW_ALTURA / 2) - (totalAltura / 2) + 60;
+
+    for (int i = 0; i < numOpcoes; i++) {
+        int x = (WINDOW_LARGURA / 2) - (larguraBotao / 2);
+        int y = inicioY + i * (alturaBotao + espacamento);
+
+        SDL_Rect botao = { x, y, larguraBotao, alturaBotao };
+        // Cor do botão
+        SDL_SetRenderDrawColor(renderer, 50, 50, 150, 255);
+        SDL_RenderFillRect(renderer, &botao);
+        // Borda branca
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        for (int b = 0; b < 3; b++) {
+    		SDL_Rect borda = { botao.x - b, botao.y - b, botao.w + 2*b, botao.h + 2*b };
+    		SDL_RenderDrawRect(renderer, &borda);
+	}
+
+        int tw, th;
+        TTF_SizeText(font_small, opcoes[i], &tw, &th);
+
+        int textX = x + (larguraBotao - tw) / 2;
+        int textY = y + (alturaBotao - th) / 2;
+
+        render_texto(renderer, font_small, opcoes[i], textX, textY, white);
+    }
+
+    render_texto(renderer, font_smaller,
+        "Pressione S para iniciar, C para creditos, Q para sair",
+        WINDOW_LARGURA/2 - 350, WINDOW_ALTURA - 40, white);
 }
 
 void render_jogo(SDL_Renderer* renderer) {
