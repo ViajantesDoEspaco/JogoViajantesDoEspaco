@@ -119,6 +119,7 @@ const char* FONT_PATH = "assets/PressStart.ttf";
 
 SDL_Texture* player_textura = NULL;
 SDL_Texture* inimigo_textura = NULL;
+SDL_Texture* inimigo2_textura = NULL;
 SDL_Texture* meteoro_textura[TEXTURAS_METEOROS];
 SDL_Texture* explosao_texturas[EXPLOSAO_FRAMES];
 SDL_Texture* powerup_hp = NULL;
@@ -150,6 +151,12 @@ Mix_Chunk* som_powerUp = NULL;
 bool powerups_spawned = false;
 int dano_do_player = 1;
 
+// Segunda onda
+bool segunda_onda_spawnada = false;
+Uint32 tempo_para_segunda_onda = 0;
+bool inimigos_onda2 = false;
+
+
 // --- FUNÇÕES ---
 
 bool colidem(SDL_Rect a, SDL_Rect b) {
@@ -172,6 +179,13 @@ bool carregar_texturas(SDL_Renderer* renderer) {
         return false;
     }
 
+    // Inimigo 2 (segunda onda)
+    inimigo2_textura = IMG_LoadTexture(renderer, "assets/inimigo2.png");
+    if (!inimigo2_textura) {
+        printf("Falha ao carregar inimigo2.png: %s\n", IMG_GetError());
+        return false;
+    }
+
     // Meteoros
     char* arquivos_meteoros[] = {
         "assets/Meteor_02.png", 
@@ -191,10 +205,10 @@ bool carregar_texturas(SDL_Renderer* renderer) {
 
     // Explosões (4 frames)
     char* arquivos_explosao[EXPLOSAO_FRAMES] = {
-        "assets/explosao_inimigo (1).png",
-        "assets/explosao_inimigo (2).png",
-        "assets/explosao_inimigo (3).png",
-        "assets/explosao_inimigo (4).png"
+        "assets/explosao_1.png",
+        "assets/explosao_2.png",
+        "assets/explosao_3.png",
+        "assets/explosao_4.png"
     };
 
     for (int i = 0; i < EXPLOSAO_FRAMES; i++) {
@@ -277,6 +291,31 @@ void iniciar_inimigos() {
         inimigos[i].ativo = true;
         inimigos[i].timer_tiros = rand() % 120;
     }
+
+}
+
+void iniciar_inimigos_onda2() {
+    int inimigo_l = 45;
+    int inimigo_h = 80;
+    int afastamento = 20;
+
+    int largura_linha = MAX_INIMIGOS * (inimigo_l + afastamento);
+    int x_inicio = (WINDOW_LARGURA / 2) - (largura_linha / 2);
+
+    for (int i = 0; i < MAX_INIMIGOS; i++) {
+        inimigos[i].rect.w = inimigo_l;
+        inimigos[i].rect.h = inimigo_h;
+
+        inimigos[i].rect.x = x_inicio + i * (inimigo_l + afastamento);
+
+        // começam fora da tela
+        inimigos[i].rect.y = -150 - (i * 18);
+        inimigos[i].saude = 12; 
+        inimigos[i].ativo = true;
+        inimigos[i].timer_tiros = rand() % 90;
+    }
+
+    inimigos_onda2 = true;
 }
 
 void iniciar_player_tiros() {
@@ -346,8 +385,8 @@ void criar_explosao_em(SDL_Rect srcRect) {
             explosoes[e].timer = 0;
             explosoes[e].rect.x = srcRect.x;
             explosoes[e].rect.y = srcRect.y;
-            explosoes[e].rect.w = srcRect.w;
-            explosoes[e].rect.h = srcRect.h;
+            explosoes[e].rect.w = 50;
+            explosoes[e].rect.h = 50;
             Mix_PlayChannel(-1, som_explosao, 0);
             break;
         }
@@ -369,11 +408,11 @@ void spawn_powerups_no(int x, int y) {
 
             // direção diagonal para baixo: um para esquerda, outro para direita, velocidades diferentes
             if (spawned == 0) {
-                powerups[i].velX = -2.5f;
-                powerups[i].velY = 3.0f;
+                powerups[i].velX = -1.5f;
+                powerups[i].velY = 2.0f;
             } else {
-                powerups[i].velX = 2.5f;
-                powerups[i].velY = 4.0f;
+                powerups[i].velX = 1.5f;
+                powerups[i].velY = 1.0f;
             }
             spawned++;
         }
@@ -548,7 +587,7 @@ void update_powerups() {
 
             // colisão com player
             if (SDL_HasIntersection(&powerups[i].rect, &player.rect)) {
-                Mix_PlayChannel(-1, som_powerup, 0);
+                Mix_PlayChannel(-1, som_powerUp, 0);
                 if (powerups[i].tipo == 0) {
                     player.saude += 3;
                     if (player.saude > PLAYER_MAX_SAUDE) player.saude = PLAYER_MAX_SAUDE;
@@ -562,38 +601,45 @@ void update_powerups() {
 }
 
 void update_inimigos() {
-    bool atingiu_limite = false;
-    inimigo_mover_timer++;
-    
-    if (inimigo_mover_timer >= inimigo_mover_delay) {
-        for (int j = 0; j < MAX_INIMIGOS; j++) {
-            if (inimigos[j].ativo) {
-                if (inimigos[j].rect.x + inimigos[j].rect.w +
-                    inimigo_velX * inimigo_dir > WINDOW_LARGURA) {
-                    atingiu_limite = true;
-                }
-                if (inimigos[j].rect.x + inimigo_velX * inimigo_dir < 0) {
-                    atingiu_limite = true;
-                }
-            }
-        }
+    // Velocidades
+	float velX = inimigos_onda2 ? 2.0f : 1.4f;
+	float velY = 10.0f;                         
 
-        for (int j = 0; j < MAX_INIMIGOS; j++) {
-            if (inimigos[j].ativo) {
-                if (atingiu_limite) {
-                    inimigos[j].rect.y += inimigo_velY; 
-                } else {
-                    inimigos[j].rect.x += inimigo_velX * inimigo_dir; 
-                }
-            }
-        }
+	// Contador de passos horizontais
+	static int passosHorizontais = 0;
+	const int passosMax = 50;
 
-        if (atingiu_limite) {
-            inimigo_dir *= -1; 
-        }
-        inimigo_mover_timer = 0;
-    }
-    
+	for (int i = 0; i < MAX_INIMIGOS; i++) {
+    	if (!inimigos[i].ativo) continue;
+    		inimigos[i].rect.x += (int)(velX * inimigo_dir);
+	}
+
+	bool tocouParede = false;
+	for (int i = 0; i < MAX_INIMIGOS; i++) {
+    	if (!inimigos[i].ativo) continue;
+
+    	if (inimigos[i].rect.x < 10 ||
+    	    inimigos[i].rect.x + inimigos[i].rect.w > WINDOW_LARGURA - 10) {
+    	    tocouParede = true;
+    	    break;
+    	}
+	}
+
+	if (tocouParede) {
+    	inimigo_dir *= -1;
+    	passosHorizontais = passosMax;
+	}
+
+	passosHorizontais++;
+
+	if (passosHorizontais >= passosMax) {
+    	for (int i = 0; i < MAX_INIMIGOS; i++) {
+        	if (!inimigos[i].ativo) continue;
+        	inimigos[i].rect.y += (int)velY;
+    	}
+    	passosHorizontais = 0;
+	}
+
     for (int j = 0; j < MAX_INIMIGOS; j++) {
         if (inimigos[j].ativo) {
             // Colisão com o player
@@ -640,13 +686,16 @@ void update_inimigos() {
                         }
                         
                         if (todosMortos && !powerups_spawned) {
-                            Mix_PlayChannel(-1, som_explosao, 0);
-                            Mix_PlayChannel(-1, som_explosao, 0);
-                            Mix_PlayChannel(-1, som_explosao, 0);
-                            // spawn de dois powerups na posição do ultimo inimigo
-                            spawn_powerups_no(ultimaPos.x + ultimaPos.w/2, ultimaPos.y + ultimaPos.h/2);
-                            powerups_spawned = true;
-                        }
+                        Mix_PlayChannel(-1, som_explosao, 0);
+                        Mix_PlayChannel(-1, som_explosao, 0);
+                        Mix_PlayChannel(-1, som_explosao, 0);
+                        // spawn de dois powerups na posição do ultimo inimigo
+                        spawn_powerups_no(ultimaPos.x + ultimaPos.w/2, ultimaPos.y + ultimaPos.h/2);
+                        powerups_spawned = true;
+
+                        // iniciar contador para segunda onda (5 segundos)
+                        tempo_para_segunda_onda = SDL_GetTicks() + 5000;
+                    }
                     }
                     break; 
                 }
@@ -737,8 +786,12 @@ void render_jogo(SDL_Renderer* renderer) {
         }
     }
     
-    // 2. Projéteis do Jogador (Amarelos)
-    SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); 
+    // 2. Projéteis do Jogador (Amarelos ou Laranja se power-up de dano)
+    if (dano_do_player > 1) {
+        SDL_SetRenderDrawColor(renderer, 255, 140, 0, 255); // laranja
+    } else {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); // amarelo
+    }
     for (int i = 0; i < PLAYER_MAX_TIROS; i++) {
         if (player_tiros[i].ativo) {
             SDL_RenderFillRect(renderer, &player_tiros[i].rect);
@@ -755,8 +808,9 @@ void render_jogo(SDL_Renderer* renderer) {
 
     // 4. Inimigos (textura)
     for (int i = 0; i < MAX_INIMIGOS; i++) {
-        if (inimigos[i].ativo && inimigo_textura != NULL) {
-            SDL_RenderCopy(renderer, inimigo_textura, NULL, &inimigos[i].rect);
+        if (inimigos[i].ativo) {
+            SDL_Texture* tex = (inimigos_onda2 ? inimigo2_textura : inimigo_textura);
+            if (tex != NULL) SDL_RenderCopy(renderer, tex, NULL, &inimigos[i].rect);
         }
     }
 
@@ -833,6 +887,7 @@ void limpar() {
     // Texturas
     SDL_DestroyTexture(player_textura);
     SDL_DestroyTexture(inimigo_textura);
+    SDL_DestroyTexture(inimigo2_textura);
     for (int i = 0; i < TEXTURAS_METEOROS; i++) {
         SDL_DestroyTexture(meteoro_textura[i]);
     }
@@ -966,7 +1021,7 @@ int main(int argc, char **argv) {
     som_explosao = Mix_LoadWAV("assets/sound_explosao.wav");
     som_powerUp = Mix_LoadWAV("assets/sound_powerUp.wav");
 
-    if (!musica_geral || !som_tiros || !som_gameover || som_explosao || som_powerUp) {
+    if (!musica_geral || !som_tiros || !som_gameover || !som_explosao || !som_powerUp) {
         printf("Erro carregando audio: %s\n", Mix_GetError());
     }
 
@@ -1021,6 +1076,14 @@ int main(int argc, char **argv) {
             update_inimigos();
             update_explosoes();
             update_powerups();
+
+            // checar se é hora de spawnar a segunda onda (5s após todos mortos)
+            if (!segunda_onda_spawnada && powerups_spawned && tempo_para_segunda_onda > 0) {
+                if (SDL_GetTicks() >= tempo_para_segunda_onda) {
+                    iniciar_inimigos_onda2();
+                    segunda_onda_spawnada = true;
+                }
+            }
         } else if (estado_atual == MENU || estado_atual == GAME_OVER ||
                     estado_atual == CREDITOS) {
             update_parallax();
