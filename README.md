@@ -1,5 +1,5 @@
 # Capa
-![Capa temporária](https://github.com/ViajantesDoEspaco/JogoViajantesDoEspaco/blob/main/capa.jpg)
+![Capa temporária](https://github.com/ViajantesDoEspaco/JogoViajantesDoEspaco/blob/580a962fe5cb9125bec9ba0ec5f68b3b1e1cc1eb/capa.png)
 
 
 # Viajantes Do Espaco
